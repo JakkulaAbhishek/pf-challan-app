@@ -16,73 +16,98 @@ st.set_page_config(
     layout="centered"
 )
 
-# ---------------- GOOGLE-STYLE UI ----------------
+# ---------------- DARK PREMIUM UI ----------------
 
 st.markdown("""
 <style>
 
 .stApp {
-    background: linear-gradient(120deg, #e3f2fd, #f8fbff);
+    background: radial-gradient(circle at top, #111827, #020617);
     font-family: "Segoe UI", sans-serif;
+    color: white;
 }
 
 .block-container {
-    background: white;
-    padding: 2.5rem;
+    background: #020617;
+    padding: 2.8rem;
     border-radius: 18px;
-    box-shadow: 0px 12px 30px rgba(0,0,0,0.08);
+    box-shadow: 0px 20px 40px rgba(0,0,0,0.7);
 }
 
 .header-card {
-    background: linear-gradient(135deg, #0d47a1, #1976d2);
-    padding: 28px;
-    border-radius: 16px;
-    margin-bottom: 25px;
+    background: linear-gradient(135deg, #020617, #0f172a, #020617);
+    padding: 32px;
+    border-radius: 20px;
+    margin-bottom: 28px;
+    box-shadow: inset 0px 0px 40px rgba(56,189,248,0.15);
 }
 
 .header-title {
     color: white;
-    font-size: 40px;
-    font-weight: 800;
+    font-size: 42px;
+    font-weight: 900;
 }
 
 .header-sub {
-    color: #e3f2fd;
+    color: #e5e7eb;
     font-size: 18px;
     margin-top: 6px;
 }
 
+.header-krishna {
+    color: #38bdf8;
+    font-size: 17px;
+    margin-top: 8px;
+    font-weight: 600;
+}
+
 .header-quote {
-    color: #ffd54f;
+    color: #facc15;
     font-style: italic;
     margin-top: 4px;
+    font-size: 15px;
 }
 
 .header-brand {
-    color: #bbdefb;
-    font-size: 14px;
-    margin-top: 8px;
+    color: #38bdf8;
+    font-size: 15px;
+    margin-top: 10px;
+    font-weight: 600;
 }
 
 .section-card {
-    background: #f5f9ff;
+    background: #020617;
     padding: 18px;
     border-radius: 14px;
-    border: 1px solid #e3f2fd;
+    border: 1px solid #1e293b;
     margin-bottom: 15px;
+    color: white;
+}
+
+label, p, h1, h2, h3, h4 {
+    color: white !important;
 }
 
 .stButton>button {
-    background: linear-gradient(135deg, #1976d2, #0d47a1);
+    background: linear-gradient(135deg, #2563eb, #0ea5e9);
     color: white;
     border-radius: 10px;
-    height: 45px;
-    font-weight: bold;
+    height: 46px;
+    font-weight: 700;
     border: none;
+    box-shadow: 0px 0px 18px rgba(56,189,248,0.6);
 }
 
 .stButton>button:hover {
-    background: linear-gradient(135deg, #0d47a1, #08306b);
+    background: linear-gradient(135deg, #1d4ed8, #0284c7);
+    box-shadow: 0px 0px 25px rgba(56,189,248,0.9);
+}
+
+[data-testid="stFileUploader"] {
+    background: #020617;
+    border-radius: 12px;
+    border: 1px solid #1e293b;
+    padding: 12px;
 }
 
 </style>
@@ -94,7 +119,8 @@ st.markdown("""
 <div class="header-card">
     <div class="header-title">📊 PF Challan Automation Tool</div>
     <div class="header-sub">Fast • Accurate • Audit-Ready PF Challan Processing</div>
-    <div class="header-quote">🌸 कर्मण्येवाधिकारस्ते मा फलेषु कदाचन</div>
+    <div class="header-krishna">🌸 Lord Krishna Blessings</div>
+    <div class="header-quote">कर्मण्येवाधिकारस्ते मा फलेषु कदाचन</div>
     <div class="header-brand">Tool developed by – Abhishek Jakkula</div>
 </div>
 """, unsafe_allow_html=True)
@@ -106,7 +132,7 @@ def pick(text, pattern):
     return m.group(1).strip() if m else ""
 
 def clean_system_date(text):
-    m = re.search(r"(\d{2}-[A-Z]{3}-\d{4})", text, re.I)
+    m = re.search(r"(\\d{2}-[A-Z]{3}-\\d{4})", text, re.I)
     return m.group(1).upper() if m else ""
 
 def calculate_due_date(wage_month):
@@ -131,8 +157,8 @@ def to_amount(val):
         return 0.0
 
 def split_challans(full_text):
-    full_text = re.sub(r"\s+", " ", full_text)
-    parts = re.split(r"(Dues for the wage month of\s+[A-Za-z]+\s+\d{4})", full_text, flags=re.I)
+    full_text = re.sub(r"\\s+", " ", full_text)
+    parts = re.split(r"(Dues for the wage month of\\s+[A-Za-z]+\\s+\\d{4})", full_text, flags=re.I)
     challans = []
     for i in range(1, len(parts), 2):
         challans.append(parts[i] + " " + parts[i+1])
@@ -142,15 +168,15 @@ def split_challans(full_text):
 
 def parse_pf_challan(block):
 
-    wage_month = pick(block, r"Dues for the wage month of\s*([A-Za-z]+\s+\d{4})")
-    system_raw = pick(block, r"system generated challan on\s*([0-9A-Za-z\-: ]+)")
+    wage_month = pick(block, r"Dues for the wage month of\\s*([A-Za-z]+\\s+\\d{4})")
+    system_raw = pick(block, r"system generated challan on\\s*([0-9A-Za-z\\-: ]+)")
     system_date_str = clean_system_date(system_raw)
     system_date = to_date(system_date_str)
     due_date = calculate_due_date(wage_month)
 
-    admin = to_amount(pick(block, r"Administration Charges\s+[0-9]+\s+([0-9,]+)"))
-    employer = to_amount(pick(block, r"Employer's Share Of\s+[0-9,]+\s+[0-9,]+\s+[0-9,]+\s+[0-9,]+\s+[0-9,]+\s+([0-9,]+)"))
-    employee = to_amount(pick(block, r"Employee's Share Of\s+[0-9,]+\s+[0-9,]+\s+[0-9,]+\s+[0-9,]+\s+[0-9,]+\s+([0-9,]+)"))
+    admin = to_amount(pick(block, r"Administration Charges\\s+[0-9]+\\s+([0-9,]+)"))
+    employer = to_amount(pick(block, r"Employer's Share Of\\s+[0-9,]+\\s+[0-9,]+\\s+[0-9,]+\\s+[0-9,]+\\s+[0-9,]+\\s+([0-9,]+)"))
+    employee = to_amount(pick(block, r"Employee's Share Of\\s+[0-9,]+\\s+[0-9,]+\\s+[0-9,]+\\s+[0-9,]+\\s+[0-9,]+\\s+([0-9,]+)"))
 
     grand_total = admin + employer + employee
 
@@ -205,7 +231,7 @@ if uploaded_files and st.button("🚀 Process Challans"):
                 for page in pdf.pages:
                     t = page.extract_text()
                     if t:
-                        text += "\n" + t
+                        text += "\\n" + t
 
             challan_blocks = split_challans(text)
 
