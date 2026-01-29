@@ -7,195 +7,154 @@ from openpyxl import load_workbook
 from openpyxl.styles import Font
 import tempfile, os
 
-# ---------------- CONFIG ----------------
-st.set_page_config(page_title="PF Challan Tool", layout="centered")
+# ---------------- PAGE CONFIG ----------------
+st.set_page_config(page_title="PF Challan Automation Tool", layout="centered")
 
-# ---------------- PREMIUM UI ----------------
+# ---------------- UI THEME ----------------
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap');
-.stApp {
-    background: radial-gradient(circle at top, #0b1220, #020617);
-    color:white;
-    font-family:Inter;
-}
+.stApp {background: radial-gradient(circle at top, #020617, #000000); color:white;}
 .block-container {max-width:950px;padding:2.5rem;}
-.header-box {
-    background:linear-gradient(135deg,#020617,#0f172a,#020617);
-    padding:34px;border-radius:22px;
-    box-shadow:0 0 45px rgba(56,189,248,0.35);
-    margin-bottom:30px;border:1px solid rgba(148,163,184,0.12);
+.header {
+background:linear-gradient(135deg,#020617,#0f172a);
+padding:28px;border-radius:20px;
+box-shadow:0 0 40px rgba(56,189,248,0.25);
+margin-bottom:28px;border:1px solid rgba(148,163,184,0.15);
 }
-.title {font-size:42px;font-weight:900;}
-.sub {color:#cbd5e1;font-size:17px;}
-.krishna {color:#38bdf8;font-size:18px;font-weight:600;margin-top:10px;}
-.quote {color:#facc15;font-size:19px;font-style:italic;}
-.brand {color:#38bdf8;font-weight:600;margin-top:10px;}
-.stButton>button {
-    background:linear-gradient(135deg,#2563eb,#0ea5e9);
-    color:white;border-radius:12px;height:48px;
-    font-weight:800;border:none;font-size:16px;
-    box-shadow:0 0 25px rgba(37,99,235,0.6);
-}
-.stButton>button:hover {
-    transform:scale(1.04);
-    box-shadow:0 0 40px rgba(14,165,233,0.9);
-}
-label,p,h1,h2,h3{color:white!important;}
+.title{font-size:38px;font-weight:900;}
+.sub{color:#cbd5e1;}
+.krishna{color:#38bdf8;font-weight:600;margin-top:8px;}
+.quote{color:#facc15;font-size:18px;font-style:italic;}
+.brand{color:#38bdf8;margin-top:8px;}
+.stButton>button{
+background:linear-gradient(135deg,#2563eb,#0ea5e9);
+border:none;border-radius:12px;font-weight:800;height:48px;
+box-shadow:0 0 25px rgba(14,165,233,.7);}
+.stButton>button:hover{transform:scale(1.03);}
+label,p{color:white!important;}
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown("""
-<div class="header-box">
+<div class="header">
 <div class="title">📊 PF Challan Automation Tool</div>
 <div class="sub">Fast • Accurate • Audit-Ready PF Challan Processing</div>
 <div class="krishna">🌸 Lord Krishna Blessings</div>
 <div class="quote">कर्मण्येवाधिकारस्ते मा फलेषु कदाचन</div>
-<div class="brand">Tool developed by - Abhishek Jakkula</div>
+<div class="brand">Tool developed by – Abhishek Jakkula</div>
 </div>
 """, unsafe_allow_html=True)
 
-# ---------------- HELPERS ----------------
+# ---------------- CORE HELPERS ----------------
 
-def pick(text, pattern):
+def safe(pattern, text):
     m = re.search(pattern, text, re.I | re.S)
     return m.group(1).strip() if m else ""
 
-def clean_system_date(text):
-    m = re.search(r"(\d{2}-[A-Z]{3}-\d{4})", text, re.I)
-    return m.group(1).upper() if m else ""
+def amount(x):
+    try: return float(x.replace(",",""))
+    except: return ""
 
-def normalize_month(text):
-    # Handles: September 2024, September2024, September-2024
-    m = re.search(r"(January|February|March|April|May|June|July|August|September|October|November|December)[\s\-]*([0-9]{4})", text, re.I)
-    if m:
-        return f"{m.group(1).title()} {m.group(2)}"
+def normalize_month(block):
+    m = re.search(r"Dues for the wage month of\s*([A-Za-z]+)\s*([0-9]{4})", block, re.I)
+    if m: return f"{m.group(1).title()} {m.group(2)}"
     return ""
 
-def calculate_due_date(wage_month):
+def system_date(block):
+    return safe(r"system generated challan on\s*.*?(\d{2}-[A-Z]{3}-\d{4})", block).upper()
+
+def due_date(month):
     try:
-        base = datetime.strptime(wage_month, "%B %Y")
-        year = base.year + (1 if base.month == 12 else 0)
-        month = 1 if base.month == 12 else base.month + 1
-        return datetime(year, month, 15)
-    except:
-        return None
+        b=datetime.strptime(month,"%B %Y")
+        y=b.year+(1 if b.month==12 else 0)
+        m=1 if b.month==12 else b.month+1
+        return datetime(y,m,15).strftime("%d-%b-%Y").upper()
+    except: return ""
 
-def to_date(date_str):
-    try:
-        return datetime.strptime(date_str, "%d-%b-%Y")
-    except:
-        return None
+def split_challans(text):
+    text=re.sub(r"\s+"," ",text)
+    parts=re.split(r"(Dues for the wage month of\s*[A-Za-z]+\s*[0-9]{4})",text,flags=re.I)
+    blocks=[]
+    for i in range(1,len(parts),2):
+        blocks.append(parts[i]+parts[i+1])
+    return blocks
 
-def to_amount(val):
-    try:
-        return float(val.replace(",", ""))
-    except:
-        return 0.0
+# ---------------- PF PARSER ----------------
 
-def split_challans(full_text):
-    full_text = re.sub(r"\s+", " ", full_text)
-    parts = re.split(r"(January|February|March|April|May|June|July|August|September|October|November|December)[\s\-]*[0-9]{4}", full_text, flags=re.I)
-    challans = []
-    for i in range(1, len(parts)-1, 2):
-        challans.append(parts[i] + parts[i+1])
-    return challans
+def parse_pf(block):
 
-# ---------------- CHALLAN PARSER ----------------
-
-def parse_pf_challan(block):
-
-    wage_month = normalize_month(block)
-
-    system_raw = pick(block, r"system generated.*?(\d{2}-[A-Z]{3}-\d{4})")
-    system_date_str = clean_system_date(system_raw)
-    system_date = to_date(system_date_str)
-    due_date = calculate_due_date(wage_month)
-
-    employee_share_str = pick(block, r"Employee'?s Share Of.*?([0-9,]{3,})")
-
-    employee_share = to_amount(employee_share_str)
-    disallowance = 0
-
-    if system_date and due_date and system_date > due_date:
-        disallowance = employee_share
+    wage = normalize_month(block)
 
     return {
-        "Wage Month": wage_month,
-        "Due Date": due_date.strftime("%d-%b-%Y").upper() if due_date else "",
-        "System Generated Date": system_date_str,
-        "Administration Charges": pick(block, r"Administration Charges.*?([0-9,]{3,})"),
-        "Employer's Share": pick(block, r"Employer'?s Share Of.*?([0-9,]{3,})"),
-        "Employee's Share": employee_share_str,
-        "Employee Share Disallowance": f"{int(disallowance):,}" if disallowance else "0",
-        "Grand Total": pick(block, r"Grand Total.*?([0-9,]{3,})")
+        "Wage Month": wage,
+        "Due Date": due_date(wage),
+        "System Generated Date": system_date(block),
+        "Administration Charges": safe(r"Administration Charges.*?([0-9,]{2,})", block),
+        "Employer's Share": safe(r"Employer'?s Share Of.*?([0-9,]{2,})", block),
+        "Employee's Share": safe(r"Employee'?s Share Of.*?([0-9,]{2,})", block),
+        "Employee Share Disallowance": "0",
+        "Grand Total": safe(r"Grand Total.*?([0-9,]{2,})", block)
     }
 
-# ---------------- EXCEL TITLE ----------------
+# ---------------- EXCEL HEADER ----------------
 
-def add_title_to_excel(file_path):
-    wb = load_workbook(file_path)
-    ws = wb.active
-    ws.insert_rows(1, amount=2)
-    ws["A1"] = "Tool developed by - Abhishek Jakkula"
-    ws["A1"].font = Font(bold=True)
-    wb.save(file_path)
+def add_title(file):
+    wb=load_workbook(file)
+    ws=wb.active
+    ws.insert_rows(1,2)
+    ws["A1"]="Tool developed by - Abhishek Jakkula"
+    ws["A1"].font=Font(bold=True)
+    wb.save(file)
 
-# ---------------- UI ----------------
+# ---------------- APP ----------------
 
 st.markdown("### 📂 Upload PF Challan PDFs")
-uploaded_files = st.file_uploader("", type=["pdf"], accept_multiple_files=True)
+files = st.file_uploader("", type="pdf", accept_multiple_files=True)
 
-if uploaded_files and st.button("🚀 Process Challans"):
+if files and st.button("🚀 Process Challans"):
 
-    all_records = []
+    data=[]
 
-    with st.spinner("Scanning PF challans..."):
+    with st.spinner("Reading PF challans..."):
 
-        for uploaded_file in uploaded_files:
+        for f in files:
+            with tempfile.NamedTemporaryFile(delete=False,suffix=".pdf") as tmp:
+                tmp.write(f.read())
+                path=tmp.name
 
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-                tmp.write(uploaded_file.read())
-                file_path = tmp.name
+            text=""
+            with pdfplumber.open(path) as pdf:
+                for p in pdf.pages:
+                    t=p.extract_text()
+                    if t: text+=t+"\n"
 
-            text = ""
-            with pdfplumber.open(file_path) as pdf:
-                for page in pdf.pages:
-                    t = page.extract_text()
-                    if t:
-                        text += "\n" + t
+            for block in split_challans(text):
+                row=parse_pf(block)
+                row["Source File"]=f.name
+                if row["Wage Month"]:
+                    data.append(row)
 
-            challan_blocks = split_challans(text)
+            os.remove(path)
 
-            for block in challan_blocks:
-                data = parse_pf_challan(block)
-                data["Source File"] = uploaded_file.name
-                all_records.append(data)
+    if data:
 
-            os.remove(file_path)
+        df=pd.DataFrame(data)
 
-    if all_records:
+        cols=["Wage Month","Due Date","System Generated Date",
+              "Administration Charges","Employer's Share","Employee's Share",
+              "Employee Share Disallowance","Grand Total","Source File"]
 
-        df = pd.DataFrame(all_records)
+        df=df[cols].reset_index(drop=True)
 
-        final_columns = [
-            "Wage Month", "Due Date", "System Generated Date",
-            "Administration Charges", "Employer's Share",
-            "Employee's Share", "Employee Share Disallowance",
-            "Grand Total", "Source File"
-        ]
+        out=f"PF_Monthwise_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        df.to_excel(out,index=False)
+        add_title(out)
 
-        df = df[final_columns].dropna(how="all").reset_index(drop=True)
+        st.success("✅ PF challan report generated successfully")
+        st.dataframe(df,use_container_width=True)
 
-        output_file = f"PF_Monthwise_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        df.to_excel(output_file, index=False)
-        add_title_to_excel(output_file)
-
-        st.success("✅ Excel generated successfully")
-        st.dataframe(df, use_container_width=True)
-
-        with open(output_file, "rb") as f:
-            st.download_button("📥 Download Excel", f, file_name=output_file)
+        with open(out,"rb") as f:
+            st.download_button("📥 Download Excel",f,file_name=out)
 
     else:
-        st.error("❌ No PF challan data found.")
+        st.error("❌ No PF challan data detected.")
