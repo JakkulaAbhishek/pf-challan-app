@@ -1,6 +1,5 @@
 import streamlit as st
 import pdfplumber
-import pytesseract
 import re
 import pandas as pd
 from datetime import datetime
@@ -8,15 +7,59 @@ from openpyxl import load_workbook
 from openpyxl.styles import Font
 import tempfile
 import os
+import base64
 
-# ---------------- CONFIG ----------------
+# ---------------- PAGE CONFIG ----------------
+st.set_page_config(page_title="AJ PF Challan Tool", layout="centered")
 
-st.set_page_config(page_title="PF Challan Tool", layout="centered")
-st.title("📊 PF Challan Automation Tool")
-st.markdown("### Tool developed by - Abhishek Jakkula")
+# ---------------- THEME & STYLING ----------------
+st.markdown("""
+<style>
+.stApp {
+    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+}
+.block-container {
+    background: rgba(0,0,0,0.75);
+    padding: 2rem;
+    border-radius: 18px;
+}
+h1,h2,h3,h4,p,label { color: white !important; }
+.header-box {
+    text-align:center;
+    padding:25px;
+    border-radius:20px;
+    border:2px solid #ff2d2d;
+    box-shadow:0px 0px 25px #ff2d2d;
+    margin-bottom:20px;
+}
+.shloka {
+    color:#ffd700;
+    font-style:italic;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ---------------- LOGO ----------------
+if os.path.exists("aj_logo.png"):
+    with open("aj_logo.png", "rb") as img:
+        encoded = base64.b64encode(img.read()).decode()
+    st.markdown(f"""
+    <div style="text-align:center;">
+        <img src="data:image/png;base64,{encoded}" width="200">
+    </div>
+    """, unsafe_allow_html=True)
+
+# ---------------- HEADER ----------------
+st.markdown("""
+<div class="header-box">
+<h1>📊 PF Challan Automation Tool</h1>
+<h3>🦚 Lord Krishna Blessings</h3>
+<p class="shloka">कर्मण्येवाधिकारस्ते मा फलेषु कदाचन</p>
+<p style="color:#cccccc;">Tool developed by - Abhishek Jakkula</p>
+</div>
+""", unsafe_allow_html=True)
 
 # ---------------- HELPERS ----------------
-
 def pick(text, pattern):
     m = re.search(pattern, text, re.I)
     return m.group(1).strip() if m else ""
@@ -55,10 +98,9 @@ def split_challans(full_text):
     return challans
 
 # ---------------- CHALLAN PARSER ----------------
-
 def parse_pf_challan(block):
-
     wage_month = pick(block, r"Dues for the wage month of\s*([A-Za-z]+\s+\d{4})")
+
     system_raw = pick(block, r"system generated challan on\s*([0-9A-Za-z\-: ]+)")
     system_date_str = clean_system_date(system_raw)
     system_date = to_date(system_date_str)
@@ -70,23 +112,26 @@ def parse_pf_challan(block):
 
     employee_share = to_amount(employee_share_str)
     disallowance = 0
-
     if system_date and due_date and system_date > due_date:
         disallowance = employee_share
+
+    admin = to_amount(pick(block, r"Administration Charges\s+[0-9]+\s+([0-9,]+)"))
+    employer = to_amount(pick(block, r"Employer's Share Of\s+[0-9,]+\s+[0-9,]+\s+[0-9,]+\s+[0-9,]+\s+[0-9,]+\s+([0-9,]+)"))
+    employee = to_amount(employee_share_str)
+    grand_total = admin + employer + employee
 
     return {
         "Wage Month": wage_month,
         "Due Date": due_date.strftime("%d-%b-%Y").upper() if due_date else "",
         "System Generated Date": system_date_str,
-        "Administration Charges": pick(block, r"Administration Charges\s+[0-9]+\s+([0-9,]+)"),
-        "Employer's Share": pick(block, r"Employer's Share Of\s+[0-9,]+\s+[0-9,]+\s+[0-9,]+\s+[0-9,]+\s+[0-9,]+\s+([0-9,]+)"),
-        "Employee's Share": employee_share_str,
-        "Employee Share Disallowance": f"{int(disallowance):,}" if disallowance else "0",
-        "Grand Total": pick(block, r"Grand Total.*?([0-9,]{3,})")
+        "Administration Charges": admin,
+        "Employer's Share": employer,
+        "Employee's Share": employee,
+        "Employee Share Disallowance": disallowance,
+        "Grand Total (Rechecked)": grand_total
     }
 
 # ---------------- EXCEL TITLE ----------------
-
 def add_title_to_excel(file_path):
     wb = load_workbook(file_path)
     ws = wb.active
@@ -96,21 +141,14 @@ def add_title_to_excel(file_path):
     wb.save(file_path)
 
 # ---------------- UI ----------------
-
-uploaded_files = st.file_uploader(
-    "📂 Upload PF Challan PDFs",
-    type=["pdf"],
-    accept_multiple_files=True
-)
+uploaded_files = st.file_uploader("📂 Upload PF Challan PDFs", type=["pdf"], accept_multiple_files=True)
 
 if uploaded_files and st.button("🚀 Process Challans"):
 
     all_records = []
 
     with st.spinner("Processing PDFs..."):
-
         for uploaded_file in uploaded_files:
-
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
                 tmp.write(uploaded_file.read())
                 file_path = tmp.name
@@ -132,29 +170,17 @@ if uploaded_files and st.button("🚀 Process Challans"):
             os.remove(file_path)
 
     if all_records:
-
         df = pd.DataFrame(all_records)
 
-        final_columns = [
-            "Wage Month",
-            "Due Date",
-            "System Generated Date",
-            "Administration Charges",
-            "Employer's Share",
-            "Employee's Share",
-            "Employee Share Disallowance",
-            "Grand Total",
-            "Source File"
-        ]
-
-        df = df[final_columns].dropna(how="all").reset_index(drop=True)
+        # ✅ ADD SERIAL NUMBER
+        df.insert(0, "S.No", range(1, len(df) + 1))
 
         output_file = f"PF_Monthwise_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         df.to_excel(output_file, index=False)
         add_title_to_excel(output_file)
 
-        st.success("✅ Excel generated successfully")
-        st.dataframe(df)
+        st.success("✅ Professional PF report generated successfully")
+        st.dataframe(df, use_container_width=True)
 
         with open(output_file, "rb") as f:
             st.download_button("📥 Download Excel", f, file_name=output_file)
