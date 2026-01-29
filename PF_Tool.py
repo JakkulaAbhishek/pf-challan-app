@@ -10,56 +10,95 @@ import os
 import base64
 
 # ---------------- PAGE CONFIG ----------------
-st.set_page_config(page_title="AJ PF Challan Tool", layout="centered")
 
-# ---------------- THEME & STYLING ----------------
+st.set_page_config(page_title="PF Challan Automation Tool", layout="centered")
+
+# ---------------- PREMIUM UI THEME ----------------
+
 st.markdown("""
 <style>
 .stApp {
-    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+    background: linear-gradient(135deg, #cbe9ff, #e8f6ff, #b3e5ff);
+    font-family: 'Segoe UI', sans-serif;
 }
+
 .block-container {
-    background: rgba(0,0,0,0.75);
-    padding: 2rem;
-    border-radius: 18px;
+    background: rgba(255,255,255,0.80);
+    padding: 2.5rem;
+    border-radius: 22px;
+    box-shadow: 0px 10px 30px rgba(0,0,0,0.15);
 }
-h1,h2,h3,h4,p,label { color: white !important; }
-.header-box {
-    text-align:center;
-    padding:25px;
-    border-radius:20px;
-    border:2px solid #ff2d2d;
-    box-shadow:0px 0px 25px #ff2d2d;
-    margin-bottom:20px;
+
+.main-card {
+    background: linear-gradient(135deg, #0f172a, #020617);
+    padding: 28px;
+    border-radius: 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
 }
+
+.title-text {
+    color: #ffffff;
+    font-size: 42px;
+    font-weight: 800;
+}
+
+.subtext {
+    color: #9fd3ff;
+    font-size: 18px;
+}
+
 .shloka {
-    color:#ffd700;
-    font-style:italic;
+    color: #ffd700;
+    font-style: italic;
+    font-size: 16px;
 }
+
+.brand {
+    color: #c7e7ff;
+    font-size: 14px;
+}
+
+.logo-box img {
+    border-radius: 50%;
+    border: 4px solid #38bdf8;
+    width: 110px;
+    height: 110px;
+    object-fit: cover;
+    box-shadow: 0px 0px 25px rgba(56,189,248,0.8);
+}
+
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------- LOGO ----------------
+# ---------------- LOGO + HEADER ----------------
+
+logo_html = ""
 if os.path.exists("aj_logo.png"):
     with open("aj_logo.png", "rb") as img:
         encoded = base64.b64encode(img.read()).decode()
-    st.markdown(f"""
-    <div style="text-align:center;">
-        <img src="data:image/png;base64,{encoded}" width="200">
+    logo_html = f"""
+    <div class="logo-box">
+        <img src="data:image/png;base64,{encoded}">
     </div>
-    """, unsafe_allow_html=True)
+    """
 
-# ---------------- HEADER ----------------
-st.markdown("""
-<div class="header-box">
-<h1>📊 PF Challan Automation Tool</h1>
-<h3>🦚 Lord Krishna Blessings</h3>
-<p class="shloka">कर्मण्येवाधिकारस्ते मा फलेषु कदाचन</p>
-<p style="color:#cccccc;">Tool developed by - Abhishek Jakkula</p>
+st.markdown(f"""
+<div class="main-card">
+    <div>
+        <div class="title-text">📊 PF Challan Automation Tool</div>
+        <div class="subtext">🌸 Lord Krishna Blessings</div>
+        <div class="shloka">कर्मण्येवाधिकारस्ते मा फलेषु कदाचन</div>
+        <div class="brand">Tool developed by – Abhishek Jakkula</div>
+    </div>
+    {logo_html}
 </div>
 """, unsafe_allow_html=True)
 
 # ---------------- HELPERS ----------------
+
 def pick(text, pattern):
     m = re.search(pattern, text, re.I)
     return m.group(1).strip() if m else ""
@@ -97,28 +136,27 @@ def split_challans(full_text):
         challans.append(parts[i] + " " + parts[i+1])
     return challans
 
-# ---------------- CHALLAN PARSER ----------------
+# ---------------- PARSER ----------------
+
 def parse_pf_challan(block):
+
     wage_month = pick(block, r"Dues for the wage month of\s*([A-Za-z]+\s+\d{4})")
 
     system_raw = pick(block, r"system generated challan on\s*([0-9A-Za-z\-: ]+)")
     system_date_str = clean_system_date(system_raw)
     system_date = to_date(system_date_str)
+
     due_date = calculate_due_date(wage_month)
-
-    employee_share_str = pick(
-        block, r"Employee's Share Of\s+[0-9,]+\s+[0-9,]+\s+[0-9,]+\s+[0-9,]+\s+[0-9,]+\s+([0-9,]+)"
-    )
-
-    employee_share = to_amount(employee_share_str)
-    disallowance = 0
-    if system_date and due_date and system_date > due_date:
-        disallowance = employee_share
 
     admin = to_amount(pick(block, r"Administration Charges\s+[0-9]+\s+([0-9,]+)"))
     employer = to_amount(pick(block, r"Employer's Share Of\s+[0-9,]+\s+[0-9,]+\s+[0-9,]+\s+[0-9,]+\s+[0-9,]+\s+([0-9,]+)"))
-    employee = to_amount(employee_share_str)
+    employee = to_amount(pick(block, r"Employee's Share Of\s+[0-9,]+\s+[0-9,]+\s+[0-9,]+\s+[0-9,]+\s+[0-9,]+\s+([0-9,]+)"))
+
     grand_total = admin + employer + employee
+
+    disallowance = 0
+    if system_date and due_date and system_date > due_date:
+        disallowance = employee
 
     return {
         "Wage Month": wage_month,
@@ -132,15 +170,17 @@ def parse_pf_challan(block):
     }
 
 # ---------------- EXCEL TITLE ----------------
+
 def add_title_to_excel(file_path):
     wb = load_workbook(file_path)
-    ws = wb.active
+    ws = wb["PF Challans Summary"]
     ws.insert_rows(1, amount=2)
     ws["A1"] = "Tool developed by - Abhishek Jakkula"
     ws["A1"].font = Font(bold=True)
     wb.save(file_path)
 
 # ---------------- UI ----------------
+
 uploaded_files = st.file_uploader("📂 Upload PF Challan PDFs", type=["pdf"], accept_multiple_files=True)
 
 if uploaded_files and st.button("🚀 Process Challans"):
@@ -148,6 +188,7 @@ if uploaded_files and st.button("🚀 Process Challans"):
     all_records = []
 
     with st.spinner("Processing PDFs..."):
+
         for uploaded_file in uploaded_files:
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
                 tmp.write(uploaded_file.read())
@@ -170,20 +211,22 @@ if uploaded_files and st.button("🚀 Process Challans"):
             os.remove(file_path)
 
     if all_records:
-        df = pd.DataFrame(all_records)
 
-        # ✅ ADD SERIAL NUMBER
+        df = pd.DataFrame(all_records)
         df.insert(0, "S.No", range(1, len(df) + 1))
 
         output_file = f"PF_Monthwise_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        df.to_excel(output_file, index=False)
+
+        with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
+            df.to_excel(writer, sheet_name="PF Challans Summary", index=False)
+
         add_title_to_excel(output_file)
 
-        st.success("✅ Professional PF report generated successfully")
-        st.dataframe(df, use_container_width=True)
+        st.success("✅ PF Challans Summary generated successfully")
+        st.dataframe(df)
 
         with open(output_file, "rb") as f:
-            st.download_button("📥 Download Excel", f, file_name=output_file)
+            st.download_button("📥 Download Excel Report", f, file_name=output_file)
 
     else:
-        st.error("No PF challan data found.")
+        st.error("❌ No PF challan data found.")
