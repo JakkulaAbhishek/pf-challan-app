@@ -5,8 +5,7 @@ import pandas as pd
 from datetime import datetime
 from openpyxl import load_workbook
 from openpyxl.styles import Font
-import tempfile
-import os
+import tempfile, os
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="PF Challan Automation Tool", layout="centered")
@@ -51,7 +50,7 @@ def safe_amount(pattern, text):
 
 def safe_text(pattern, text):
     m = re.search(pattern, text, re.I | re.S)
-    return m.group(1).strip() if m else ""
+    return m.group().strip() if m else ""
 
 def normalize_month(text):
     m = re.search(MONTH_REGEX, text, re.I)
