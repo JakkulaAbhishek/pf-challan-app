@@ -11,59 +11,88 @@ import os
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="PF Challan Automation Tool", layout="centered")
 
-# ---------------- PREMIUM UI ----------------
+# ---------------- GOOGLE STYLE PREMIUM UI ----------------
 st.markdown("""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap');
+
 .stApp {
     background: radial-gradient(circle at top, #0b1220, #020617);
     color: white;
-    font-family: "Segoe UI", sans-serif;
+    font-family: 'Inter', sans-serif;
 }
+
 .block-container {
-    background: #020617;
     padding: 2.5rem;
-    border-radius: 18px;
+    max-width: 900px;
 }
+
 .header-box {
     background: linear-gradient(135deg, #020617, #0f172a, #020617);
-    padding: 30px;
-    border-radius: 20px;
-    box-shadow: 0px 0px 40px rgba(56,189,248,0.35);
+    padding: 34px;
+    border-radius: 22px;
+    box-shadow: 0px 0px 50px rgba(56,189,248,0.45);
     margin-bottom: 30px;
+    border: 1px solid rgba(148,163,184,0.15);
 }
+
 .title {
-    font-size: 42px;
+    font-size: 44px;
     font-weight: 900;
     color: white;
+    letter-spacing: 0.5px;
 }
+
 .sub {
     color: #cbd5e1;
     font-size: 17px;
+    margin-top: 8px;
 }
+
 .krishna {
     color: #38bdf8;
     font-size: 18px;
-    margin-top: 10px;
+    margin-top: 14px;
     font-weight: 600;
 }
+
 .quote {
     color: #facc15;
-    font-size: 18px;
+    font-size: 19px;
     font-style: italic;
+    margin-top: 2px;
 }
+
 .brand {
     color: #38bdf8;
     font-weight: 600;
+    margin-top: 12px;
 }
+
+.upload-box {
+    background: #020617;
+    border-radius: 16px;
+    padding: 24px;
+    border: 1px solid rgba(148,163,184,0.15);
+    box-shadow: inset 0 0 20px rgba(56,189,248,0.08);
+}
+
 .stButton>button {
     background: linear-gradient(135deg, #2563eb, #0ea5e9);
     color: white;
-    border-radius: 10px;
+    border-radius: 12px;
     height: 48px;
     font-weight: 800;
     border: none;
-    box-shadow: 0px 0px 20px rgba(37,99,235,0.5);
+    font-size: 16px;
+    box-shadow: 0px 0px 25px rgba(37,99,235,0.6);
 }
+
+.stButton>button:hover {
+    transform: scale(1.03);
+    box-shadow: 0px 0px 40px rgba(14,165,233,0.9);
+}
+
 label, p, h1, h2, h3 {
     color: white !important;
 }
@@ -73,17 +102,14 @@ label, p, h1, h2, h3 {
 st.markdown("""
 <div class="header-box">
     <div class="title">📊 PF Challan Automation Tool</div>
-    <p class="sub">Fast • Accurate • Audit-Ready PF Challan Processing</p>
-    <p class="krishna">🌸 Lord Krishna Blessings</p>
-    <p class="quote">कर्मण्येवाधिकारस्ते मा फलेषु कदाचन</p>
-    <p class="brand">Tool developed by - Abhishek Jakkula</p>
+    <div class="sub">Fast • Accurate • Audit-Ready PF Challan Processing</div>
+    <div class="krishna">🌸 Lord Krishna Blessings</div>
+    <div class="quote">कर्मण्येवाधिकारस्ते मा फलेषु कदाचन</div>
+    <div class="brand">Tool developed by - Abhishek Jakkula</div>
 </div>
 """, unsafe_allow_html=True)
 
 # ---------------- HELPERS ----------------
-def pick(text, pattern):
-    m = re.search(pattern, text, re.I | re.S)
-    return m.group(1).strip() if m else ""
 
 def to_amount(val):
     try:
@@ -100,13 +126,22 @@ def calculate_due_date(wage_month):
     except:
         return ""
 
-# ---------------- 🔥 MONTH-SAFE SPLITTER ----------------
+# ---------------- 🚨 BULLETPROOF MONTH ENGINE ----------------
+
+MONTH_REGEX = r"(January|February|March|April|May|June|July|August|September|October|November|December)[\s\-]*([0-9]{4})"
+
+def normalize_month(text):
+    m = re.search(MONTH_REGEX, text, re.I)
+    if m:
+        return f"{m.group(1).title()} {m.group(2)}"
+    return ""
+
 def split_challans(text):
 
     text = re.sub(r"\s+", " ", text)
 
-    months = r"(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}"
-    matches = [(m.start(), m.group()) for m in re.finditer(months, text, re.I)]
+    matches = [(m.start(), normalize_month(m.group())) 
+               for m in re.finditer(MONTH_REGEX, text, re.I)]
 
     blocks = []
     for i in range(len(matches)):
@@ -117,33 +152,33 @@ def split_challans(text):
     return blocks
 
 # ---------------- CHALLAN PARSER ----------------
+
 def parse_pf_challan(block):
 
-    wage_month = pick(block, r"(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}")
+    wage_month = normalize_month(block)
+    system_date = re.search(r"\d{2}-[A-Z]{3}-\d{4}", block)
 
-    system_date = pick(block, r"(\d{2}-[A-Z]{3}-\d{4})")
-    due_date = calculate_due_date(wage_month)
+    admin = to_amount(re.search(r"Administration Charges.*?([0-9,]{3,})", block, re.I | re.S).group(1)) if re.search(r"Administration Charges", block, re.I) else 0
+    employer = to_amount(re.search(r"Employer'?s Share Of.*?([0-9,]{3,})", block, re.I | re.S).group(1)) if re.search(r"Employer", block, re.I) else 0
+    employee = to_amount(re.search(r"Employee'?s Share Of.*?([0-9,]{3,})", block, re.I | re.S).group(1)) if re.search(r"Employee", block, re.I) else 0
+    challan_total = to_amount(re.search(r"Grand Total.*?([0-9,]{3,})", block, re.I | re.S).group(1)) if re.search(r"Grand Total", block, re.I) else 0
 
-    admin = to_amount(pick(block, r"Administration Charges.*?([0-9,]{3,})"))
-    employer = to_amount(pick(block, r"Employer'?s Share Of.*?([0-9,]{3,})"))
-    employee = to_amount(pick(block, r"Employee'?s Share Of.*?([0-9,]{3,})"))
-
-    challan_total = to_amount(pick(block, r"Grand Total.*?([0-9,]{3,})"))
-    computed_total = admin + employer + employee
+    computed = admin + employer + employee
 
     return {
         "Wage Month": wage_month,
-        "Due Date": due_date,
-        "System Generated Date": system_date,
+        "Due Date": calculate_due_date(wage_month),
+        "System Generated Date": system_date.group() if system_date else "",
         "Administration Charges": admin,
         "Employer's Share": employer,
         "Employee's Share": employee,
-        "Computed Total": computed_total,
+        "Computed Total": computed,
         "Challan Total": challan_total,
-        "Match Status": "MATCH ✅" if abs(computed_total - challan_total) < 1 else "MISMATCH ❌"
+        "Match Status": "MATCH ✅" if abs(computed - challan_total) < 1 else "MISMATCH ❌"
     }
 
 # ---------------- EXCEL TITLE ----------------
+
 def add_title_to_excel(file_path):
     wb = load_workbook(file_path)
     ws = wb["PF Challans Summary"]
@@ -153,14 +188,16 @@ def add_title_to_excel(file_path):
     wb.save(file_path)
 
 # ---------------- UI ----------------
-uploaded_files = st.file_uploader("📂 Upload PF Challan PDFs", type=["pdf"], accept_multiple_files=True)
+
+st.markdown("### 📂 Upload PF Challan PDFs")
+uploaded_files = st.file_uploader("", type=["pdf"], accept_multiple_files=True)
 
 if uploaded_files and st.button("🚀 Process Challans"):
 
     all_records = []
     sl = 1
 
-    with st.spinner("Scanning all months..."):
+    with st.spinner("Scanning all months including September2024 format..."):
 
         for uploaded_file in uploaded_files:
 
@@ -176,7 +213,7 @@ if uploaded_files and st.button("🚀 Process Challans"):
                         text += "\n" + t
 
             blocks = split_challans(text)
-            st.info(f"📄 Months detected in file: {len(blocks)}")
+            st.success(f"📄 Months detected: {len(blocks)}")
 
             for block in blocks:
                 data = parse_pf_challan(block)
@@ -203,7 +240,7 @@ if uploaded_files and st.button("🚀 Process Challans"):
 
         add_title_to_excel(output)
 
-        st.success("✅ All months detected & September issue fixed successfully")
+        st.success("✅ All months extracted successfully (September2024 fixed)")
         st.dataframe(df, use_container_width=True)
 
         with open(output, "rb") as f:
