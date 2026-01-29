@@ -15,17 +15,17 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap');
 .stApp {background: radial-gradient(circle at top, #0b1220, #020617); color:white; font-family:Inter;}
-.block-container {max-width:900px;padding:2.5rem;}
+.block-container {max-width:950px;padding:2.5rem;}
 .header-box {background:linear-gradient(135deg,#020617,#0f172a,#020617);padding:34px;border-radius:22px;
-box-shadow:0 0 50px rgba(56,189,248,0.45);margin-bottom:30px;border:1px solid rgba(148,163,184,0.15);}
-.title {font-size:44px;font-weight:900;}
+box-shadow:0 0 45px rgba(56,189,248,0.35);margin-bottom:30px;border:1px solid rgba(148,163,184,0.12);}
+.title {font-size:42px;font-weight:900;}
 .sub {color:#cbd5e1;font-size:17px;}
 .krishna {color:#38bdf8;font-size:18px;font-weight:600;margin-top:10px;}
 .quote {color:#facc15;font-size:19px;font-style:italic;}
 .brand {color:#38bdf8;font-weight:600;margin-top:10px;}
 .stButton>button {background:linear-gradient(135deg,#2563eb,#0ea5e9);color:white;border-radius:12px;height:48px;
 font-weight:800;border:none;font-size:16px;box-shadow:0 0 25px rgba(37,99,235,0.6);}
-.stButton>button:hover {transform:scale(1.03);box-shadow:0 0 40px rgba(14,165,233,0.9);}
+.stButton>button:hover {transform:scale(1.04);box-shadow:0 0 40px rgba(14,165,233,0.9);}
 label,p,h1,h2,h3{color:white!important;}
 </style>
 """, unsafe_allow_html=True)
@@ -40,7 +40,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ---------------- SAFE HELPERS ----------------
+# ---------------- HELPERS ----------------
 
 MONTH_REGEX = r"(January|February|March|April|May|June|July|August|September|October|November|December)[\s\-]*([0-9]{4})"
 
@@ -50,7 +50,7 @@ def safe_amount(pattern, text):
 
 def safe_text(pattern, text):
     m = re.search(pattern, text, re.I | re.S)
-    return m.group().strip() if m else ""
+    return m.group(1).strip() if m and m.lastindex else (m.group().strip() if m else "")
 
 def normalize_month(text):
     m = re.search(MONTH_REGEX, text, re.I)
@@ -82,14 +82,16 @@ def split_challans(text):
 def parse_pf_challan(block):
 
     wage_month = normalize_month(block)
-    system_date = safe_text(r"\d{2}-[A-Z]{3}-\d{4}", block)
+
+    system_date = safe_text(
+        r"(?:System Generated Challan on|System Generated on|System generated challan on).*?(\d{2}-[A-Z]{3}-\d{4})",
+        block
+    )
 
     admin = safe_amount(r"Administration Charges.*?([0-9,]{3,})", block)
     employer = safe_amount(r"Employer'?s Share Of.*?([0-9,]{3,})", block)
     employee = safe_amount(r"Employee'?s Share Of.*?([0-9,]{3,})", block)
     challan_total = safe_amount(r"Grand Total.*?([0-9,]{3,})", block)
-
-    computed = round(admin + employer + employee, 2)
 
     return {
         "Wage Month": wage_month,
@@ -98,9 +100,7 @@ def parse_pf_challan(block):
         "Administration Charges": admin,
         "Employer's Share": employer,
         "Employee's Share": employee,
-        "Computed Total": computed,
-        "Challan Total": challan_total,
-        "Match Status": "MATCH ✅" if abs(computed - challan_total) < 1 else "MISMATCH ❌"
+        "Grand Total": challan_total
     }
 
 # ---------------- EXCEL TITLE ----------------
@@ -155,8 +155,8 @@ if uploaded_files and st.button("🚀 Process Challans"):
         df = pd.DataFrame(all_records)
         df = df[[
             "Sl No","Wage Month","Due Date","System Generated Date",
-            "Administration Charges","Employer's Share","Employee's Share",
-            "Computed Total","Challan Total","Match Status","Source File"
+            "Administration Charges","Employer's Share",
+            "Employee's Share","Grand Total","Source File"
         ]]
 
         output = f"PF_Challans_Summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
@@ -166,7 +166,7 @@ if uploaded_files and st.button("🚀 Process Challans"):
 
         add_title_to_excel(output)
 
-        st.success("✅ All months extracted successfully")
+        st.success("✅ PF challans extracted successfully")
         st.dataframe(df, use_container_width=True)
 
         with open(output, "rb") as f:
