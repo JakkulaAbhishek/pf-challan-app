@@ -7,93 +7,95 @@ from openpyxl import load_workbook
 from openpyxl.styles import Font
 import tempfile
 import os
-import base64
 
 # ---------------- PAGE CONFIG ----------------
 
-st.set_page_config(page_title="PF Challan Automation Tool", layout="centered")
+st.set_page_config(
+    page_title="PF Challan Automation Tool",
+    page_icon="📊",
+    layout="centered"
+)
 
-# ---------------- PREMIUM UI THEME ----------------
+# ---------------- GOOGLE-STYLE UI ----------------
 
 st.markdown("""
 <style>
+
 .stApp {
-    background: linear-gradient(135deg, #cbe9ff, #e8f6ff, #b3e5ff);
-    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(120deg, #e3f2fd, #f8fbff);
+    font-family: "Segoe UI", sans-serif;
 }
 
 .block-container {
-    background: rgba(255,255,255,0.80);
+    background: white;
     padding: 2.5rem;
-    border-radius: 22px;
-    box-shadow: 0px 10px 30px rgba(0,0,0,0.15);
+    border-radius: 18px;
+    box-shadow: 0px 12px 30px rgba(0,0,0,0.08);
 }
 
-.main-card {
-    background: linear-gradient(135deg, #0f172a, #020617);
+.header-card {
+    background: linear-gradient(135deg, #0d47a1, #1976d2);
     padding: 28px;
-    border-radius: 22px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    border-radius: 16px;
     margin-bottom: 25px;
 }
 
-.title-text {
-    color: #ffffff;
-    font-size: 42px;
+.header-title {
+    color: white;
+    font-size: 40px;
     font-weight: 800;
 }
 
-.subtext {
-    color: #9fd3ff;
+.header-sub {
+    color: #e3f2fd;
     font-size: 18px;
+    margin-top: 6px;
 }
 
-.shloka {
-    color: #ffd700;
+.header-quote {
+    color: #ffd54f;
     font-style: italic;
-    font-size: 16px;
+    margin-top: 4px;
 }
 
-.brand {
-    color: #c7e7ff;
+.header-brand {
+    color: #bbdefb;
     font-size: 14px;
+    margin-top: 8px;
 }
 
-.logo-box img {
-    border-radius: 50%;
-    border: 4px solid #38bdf8;
-    width: 110px;
-    height: 110px;
-    object-fit: cover;
-    box-shadow: 0px 0px 25px rgba(56,189,248,0.8);
+.section-card {
+    background: #f5f9ff;
+    padding: 18px;
+    border-radius: 14px;
+    border: 1px solid #e3f2fd;
+    margin-bottom: 15px;
+}
+
+.stButton>button {
+    background: linear-gradient(135deg, #1976d2, #0d47a1);
+    color: white;
+    border-radius: 10px;
+    height: 45px;
+    font-weight: bold;
+    border: none;
+}
+
+.stButton>button:hover {
+    background: linear-gradient(135deg, #0d47a1, #08306b);
 }
 
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------- LOGO + HEADER ----------------
+# ---------------- HEADER ----------------
 
-logo_html = ""
-if os.path.exists("aj_logo.png"):
-    with open("aj_logo.png", "rb") as img:
-        encoded = base64.b64encode(img.read()).decode()
-    logo_html = f"""
-    <div class="logo-box">
-        <img src="data:image/png;base64,{encoded}">
-    </div>
-    """
-
-st.markdown(f"""
-<div class="main-card">
-    <div>
-        <div class="title-text">📊 PF Challan Automation Tool</div>
-        <div class="subtext">🌸 Lord Krishna Blessings</div>
-        <div class="shloka">कर्मण्येवाधिकारस्ते मा फलेषु कदाचन</div>
-        <div class="brand">Tool developed by – Abhishek Jakkula</div>
-    </div>
-    {logo_html}
+st.markdown("""
+<div class="header-card">
+    <div class="header-title">📊 PF Challan Automation Tool</div>
+    <div class="header-sub">Fast • Accurate • Audit-Ready PF Challan Processing</div>
+    <div class="header-quote">🌸 कर्मण्येवाधिकारस्ते मा फलेषु कदाचन</div>
+    <div class="header-brand">Tool developed by – Abhishek Jakkula</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -141,11 +143,9 @@ def split_challans(full_text):
 def parse_pf_challan(block):
 
     wage_month = pick(block, r"Dues for the wage month of\s*([A-Za-z]+\s+\d{4})")
-
     system_raw = pick(block, r"system generated challan on\s*([0-9A-Za-z\-: ]+)")
     system_date_str = clean_system_date(system_raw)
     system_date = to_date(system_date_str)
-
     due_date = calculate_due_date(wage_month)
 
     admin = to_amount(pick(block, r"Administration Charges\s+[0-9]+\s+([0-9,]+)"))
@@ -166,7 +166,7 @@ def parse_pf_challan(block):
         "Employer's Share": employer,
         "Employee's Share": employee,
         "Employee Share Disallowance": disallowance,
-        "Grand Total (Rechecked)": grand_total
+        "Grand Total (Verified)": grand_total
     }
 
 # ---------------- EXCEL TITLE ----------------
@@ -181,15 +181,21 @@ def add_title_to_excel(file_path):
 
 # ---------------- UI ----------------
 
-uploaded_files = st.file_uploader("📂 Upload PF Challan PDFs", type=["pdf"], accept_multiple_files=True)
+st.markdown('<div class="section-card">📂 Upload PF Challan PDFs</div>', unsafe_allow_html=True)
+
+uploaded_files = st.file_uploader(
+    "Upload one or multiple PF challan PDFs",
+    type=["pdf"],
+    accept_multiple_files=True
+)
 
 if uploaded_files and st.button("🚀 Process Challans"):
 
     all_records = []
 
-    with st.spinner("Processing PDFs..."):
-
+    with st.spinner("Processing PF Challans..."):
         for uploaded_file in uploaded_files:
+
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
                 tmp.write(uploaded_file.read())
                 file_path = tmp.name
@@ -215,7 +221,7 @@ if uploaded_files and st.button("🚀 Process Challans"):
         df = pd.DataFrame(all_records)
         df.insert(0, "S.No", range(1, len(df) + 1))
 
-        output_file = f"PF_Monthwise_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        output_file = f"PF_Challans_Summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
 
         with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
             df.to_excel(writer, sheet_name="PF Challans Summary", index=False)
@@ -223,10 +229,10 @@ if uploaded_files and st.button("🚀 Process Challans"):
         add_title_to_excel(output_file)
 
         st.success("✅ PF Challans Summary generated successfully")
-        st.dataframe(df)
+        st.dataframe(df, use_container_width=True)
 
         with open(output_file, "rb") as f:
             st.download_button("📥 Download Excel Report", f, file_name=output_file)
 
     else:
-        st.error("❌ No PF challan data found.")
+        st.error("❌ No usable PF challan data found.")
