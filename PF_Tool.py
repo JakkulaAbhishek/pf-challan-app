@@ -41,7 +41,7 @@ st.markdown("""
 <div class="sub">Fast • Accurate • Audit-Ready PF Challan Processing</div>
 <div class="krishna">🌸 Lord Krishna Blessings</div>
 <div class="quote">कर्मण्येवाधिकारस्ते मा फलेषु कदाचन</div>
-<div class="brand">Tool developed by – Abhishek Jakkula</div>
+<div class="brand">Tool developed by – Abhishek Jakkula mail - jakkulaabhishek5@gmail.com</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -158,4 +158,5 @@ if files and st.button("🚀 Process Challans"):
 
     else:
         st.error("❌ No PF challan data detected bro recheck yaaro.")
+
 
