@@ -17,10 +17,12 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     .stApp { background: radial-gradient(circle at 20% 20%, #0f172a 0%, #020617 100%); color: #f8fafc; }
+    
     .header-card {
         background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8));
         padding: 40px; border-radius: 28px; border: 1px solid rgba(255, 255, 255, 0.1);
         backdrop-filter: blur(20px); text-align: center; margin-bottom: 40px;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4);
     }
     .main-title {
         background: linear-gradient(90deg, #38bdf8, #60a5fa, #34d399);
@@ -31,6 +33,10 @@ st.markdown("""
         background: linear-gradient(90deg, #2563eb, #0ea5e9);
         color: white !important; border: none; border-radius: 14px;
         font-weight: 800; height: 60px; width: 100%; transition: 0.4s;
+    }
+    [data-testid="stMetric"] {
+        background: rgba(30, 41, 59, 0.6) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        padding: 25px !important; border-radius: 24px !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -46,7 +52,10 @@ st.markdown("""
 # ---------------- HELPERS ----------------
 def safe_extract(pattern, text):
     m = re.search(pattern, text, re.I | re.S)
-    return m.group(1).strip() if m else "0"
+    if m:
+        val = m.group(1).replace(",", "").strip()
+        return val if val else "0"
+    return "0"
 
 def calculate_due_date(wage_month_str):
     try:
@@ -57,6 +66,20 @@ def calculate_due_date(wage_month_str):
         next_y = year + (1 if month_dt.month == 12 else 0)
         return datetime(next_y, next_m, 15)
     except: return None
+
+# ---------------- EXPORT ENGINES ----------------
+def to_excel_pro(df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='PF_Audit_Report')
+        ws = writer.sheets['PF_Audit_Report']
+        h_fill, h_font = PatternFill(start_color="1e293b", end_color="1e293b", fill_type="solid"), Font(bold=True, color="FFFFFF")
+        for cell in ws[1]:
+            cell.font, cell.fill, cell.alignment = h_font, h_fill, Alignment(horizontal="center")
+        for col in ws.columns:
+            max_len = max([len(str(cell.value)) for cell in col])
+            ws.column_dimensions[col[0].column_letter].width = max_len + 3
+    return output.getvalue()
 
 def generate_pdf_summary(df, total_pf, disallowance):
     pdf = FPDF(orientation='L', unit='mm', format='A4')
@@ -101,20 +124,24 @@ if files and run_audit:
     for f in files:
         with pdfplumber.open(f) as pdf:
             text = "\n".join([p.extract_text() for p in pdf.pages if p.extract_text()])
+            # Deep Scan Splitting Logic
             blocks = re.split(r"(Dues for the wage month of\s*[A-Za-z]+\s*[0-9]{4})", text, flags=re.I)
             for i in range(1, len(blocks), 2):
                 content = blocks[i] + blocks[i+1]
+                content = re.sub(r'\s+', ' ', content) # Normalize spaces
+                
                 m_match = re.search(r"wage month of\s*([A-Za-z]+)\s*([0-9]{4})", content, re.I)
                 wage_month = f"{m_match.group(1).title()} {m_match.group(2)}" if m_match else "Unknown"
+                
                 sys_date_str = safe_extract(r"system generated challan on\s*.*?(\d{2}-[A-Z]{3}-\d{4})", content).upper()
                 due_dt = calculate_due_date(wage_month)
                 
-                # Enhanced Financial Extraction
-                admin = float(safe_extract(r"Administration Charges.*?(\d[\d,.]*)", content).replace(",", ""))
-                employer = float(safe_extract(r"Employer'?s Share Of.*?(\d[\d,.]*)", content).replace(",", ""))
-                employee = float(safe_extract(r"Employee'?s Share Of.*?(\d[\d,.]*)", content).replace(",", ""))
+                # Dynamic Financial Extraction
+                admin = float(safe_extract(r"Administration Charges.*?(\d[\d,.]*)", content))
+                employer = float(safe_extract(r"Employer'?s Share Of.*?(\d[\d,.]*)", content))
+                employee = float(safe_extract(r"Employee'?s Share Of.*?(\d[\d,.]*)", content))
                 
-                # FIXED: Force Grand Total to be the mathematical sum to avoid extraction errors
+                # Sum Verification Logic
                 grand_total = admin + employer + employee
                 
                 late_days = (datetime.strptime(sys_date_str, "%d-%b-%Y") - due_dt).days if due_dt and sys_date_str != "0" else 0
@@ -129,15 +156,28 @@ if files and run_audit:
 
     if all_rows:
         df = pd.DataFrame(all_rows)
-        st.markdown("### 📊 STATUTORY DASHBOARD")
-        m1, m2, m3 = st.columns(3)
         total_pf, total_dis = df['Grand Total (INR)'].sum(), df['PF Disallowance (INR)'].sum()
+        
+        st.markdown("### 📊 STATUTORY COMMAND INSIGHTS")
+        m1, m2, m3 = st.columns(3)
         m1.metric("TOTAL PF AUDITED", f"INR {total_pf:,.2f}")
         m2.metric("TAX DISALLOWANCE", f"INR {total_dis:,.2f}", delta_color="inverse")
         m3.metric("LATE FILINGS", len(df[df['Late Days'] > 0]))
 
-        # Charts and Downloads
-        st.download_button("📜 DOWNLOAD PDF AUDIT TRAIL", generate_pdf_summary(df, total_pf, total_dis), "PF_Audit_Trail.pdf", "application/pdf")
-        st.dataframe(df.style.format({"Grand Total (INR)": "{:,.2f}", "PF Disallowance (INR)": "{:,.2f}"}), use_container_width=True)
+        # Charts Section
+        st.markdown("---")
+        c1, c2 = st.columns([1.5, 1])
+        with c1:
+            fig = px.bar(df, x='Wage Month', y='Grand Total (INR)', color='Late Days', title="PF Trends (Negative = Early Pay)")
+            fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="white"))
+            st.plotly_chart(fig, use_container_width=True)
+        with c2:
+            st.markdown("#### 📥 EXPORT COMMANDS")
+            st.download_button("🚀 DOWNLOAD EXCEL REPORT", to_excel_pro(df), "PF_Audit.xlsx")
+            st.download_button("📜 DOWNLOAD PDF AUDIT TRAIL", generate_pdf_summary(df, total_pf, total_dis), "PF_Audit_Trail.pdf")
+
+        st.dataframe(df.style.format({"Grand Total (INR)": "{:,.2f}", "PF Disallowance (INR)": "{:,.2f}", "Admin Charges (INR)": "{:,.2f}"}), use_container_width=True)
+    else:
+        st.error("❌ No valid patterns found. Ensure the PDF is a digital EPFO challan receipt.")
 
 st.caption("© 2026 | Enterprise Auditor Pro | Developed by Abhishek Jakkula")
