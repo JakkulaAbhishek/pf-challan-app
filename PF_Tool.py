@@ -9,15 +9,15 @@ import plotly.express as px
 from fpdf import FPDF
 
 # ---------------- PAGE CONFIG ----------------
-st.set_page_config(page_title="PF AI Command Center", layout="wide", page_icon="📊")
+st.set_page_config(page_title="PF AI Command Center | Abhishek Jakkula", layout="wide", page_icon="📊")
 
-# ---------------- ULTRA STYLISH UI ----------------
+# ---------------- ULTRA STYLISH UI THEME ----------------
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     .stApp { background: radial-gradient(circle at 20% 20%, #0f172a 0%, #020617 100%); color: #f8fafc; }
-    
+
     .header-card {
         background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8));
         padding: 40px; border-radius: 28px; border: 1px solid rgba(255, 255, 255, 0.1);
@@ -41,6 +41,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# ---------------- BRANDED HEADER ----------------
 st.markdown("""
 <div class="header-card">
     <div class="main-title">PF CHALLAN AI COMMAND CENTER</div>
@@ -52,10 +53,7 @@ st.markdown("""
 # ---------------- HELPERS ----------------
 def safe_extract(pattern, text):
     m = re.search(pattern, text, re.I | re.S)
-    if m:
-        val = m.group(1).replace(",", "").strip()
-        return val if val else "0"
-    return "0"
+    return m.group(1).replace(",", "").strip() if m else "0"
 
 def calculate_due_date(wage_month_str):
     try:
@@ -67,7 +65,7 @@ def calculate_due_date(wage_month_str):
         return datetime(next_y, next_m, 15)
     except: return None
 
-# ---------------- EXPORT ENGINES ----------------
+# ---------------- EXCEL EXPORTER ----------------
 def to_excel_pro(df):
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -81,6 +79,7 @@ def to_excel_pro(df):
             ws.column_dimensions[col[0].column_letter].width = max_len + 3
     return output.getvalue()
 
+# ---------------- PDF GENERATOR (FIXED ENCODING) ----------------
 def generate_pdf_summary(df, total_pf, disallowance):
     pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.add_page()
@@ -95,7 +94,7 @@ def generate_pdf_summary(df, total_pf, disallowance):
     pdf.ln(5)
 
     pdf.set_font("Arial", 'B', 8); pdf.set_fill_color(30, 41, 59); pdf.set_text_color(255, 255, 255)
-    w = [30, 25, 25, 15, 25, 30, 30, 30, 30, 20] 
+    w = [30, 25, 25, 15, 25, 30, 30, 30, 35, 20] 
     headers = ["Wage Month", "Due Date", "Paid Date", "Diff", "Admin", "Employer", "Employee", "Total", "Disallowance", "Status"]
     for i in range(len(headers)): pdf.cell(w[i], 10, headers[i], 1, 0, 'C', True)
     pdf.ln()
@@ -115,34 +114,31 @@ def generate_pdf_summary(df, total_pf, disallowance):
     
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
-# ---------------- MAIN APP ----------------
-files = st.file_uploader("📂 DROP PF CHALLAN PDFs HERE", type="pdf", accept_multiple_files=True)
-run_audit = st.button("🚀 INITIATE SYSTEM AUDIT")
+# ---------------- COMMAND CENTER ----------------
+col_f, col_a = st.columns([2, 1])
+with col_f: files = st.file_uploader("📂 DROP PF CHALLAN PDFs HERE", type="pdf", accept_multiple_files=True)
+with col_a: 
+    st.markdown("<br>", unsafe_allow_html=True)
+    run_audit = st.button("🚀 INITIATE SYSTEM AUDIT")
 
 if files and run_audit:
     all_rows = []
     for f in files:
         with pdfplumber.open(f) as pdf:
             text = "\n".join([p.extract_text() for p in pdf.pages if p.extract_text()])
-            # Deep Scan Splitting Logic
             blocks = re.split(r"(Dues for the wage month of\s*[A-Za-z]+\s*[0-9]{4})", text, flags=re.I)
             for i in range(1, len(blocks), 2):
                 content = blocks[i] + blocks[i+1]
-                content = re.sub(r'\s+', ' ', content) # Normalize spaces
-                
                 m_match = re.search(r"wage month of\s*([A-Za-z]+)\s*([0-9]{4})", content, re.I)
                 wage_month = f"{m_match.group(1).title()} {m_match.group(2)}" if m_match else "Unknown"
-                
                 sys_date_str = safe_extract(r"system generated challan on\s*.*?(\d{2}-[A-Z]{3}-\d{4})", content).upper()
                 due_dt = calculate_due_date(wage_month)
                 
-                # Dynamic Financial Extraction
-                admin = float(safe_extract(r"Administration Charges.*?(\d[\d,.]*)", content))
-                employer = float(safe_extract(r"Employer'?s Share Of.*?(\d[\d,.]*)", content))
-                employee = float(safe_extract(r"Employee'?s Share Of.*?(\d[\d,.]*)", content))
-                
-                # Sum Verification Logic
-                grand_total = admin + employer + employee
+                # Deep Scan Extraction from tabular columns
+                admin = float(safe_extract(r"Administration Charges.*?(\d[\d,.]*)$", content))
+                employer = float(safe_extract(r"Employer'?s Share Of.*?(\d[\d,.]*)$", content))
+                employee = float(safe_extract(r"Employee'?s Share Of.*?(\d[\d,.]*)$", content))
+                grand_total = float(safe_extract(r"Grand Total\s*:\s*.*?\s+(\d[\d,.]*)$", content))
                 
                 late_days = (datetime.strptime(sys_date_str, "%d-%b-%Y") - due_dt).days if due_dt and sys_date_str != "0" else 0
                 
@@ -161,23 +157,21 @@ if files and run_audit:
         st.markdown("### 📊 STATUTORY COMMAND INSIGHTS")
         m1, m2, m3 = st.columns(3)
         m1.metric("TOTAL PF AUDITED", f"INR {total_pf:,.2f}")
-        m2.metric("TAX DISALLOWANCE", f"INR {total_dis:,.2f}", delta_color="inverse")
+        m2.metric("TAX DISALLOWANCE", f"INR {total_dis:,.2f}", delta=f"Risk: {total_dis*0.3:,.0f}", delta_color="inverse")
         m3.metric("LATE FILINGS", len(df[df['Late Days'] > 0]))
 
-        # Charts Section
         st.markdown("---")
         c1, c2 = st.columns([1.5, 1])
         with c1:
-            fig = px.bar(df, x='Wage Month', y='Grand Total (INR)', color='Late Days', title="PF Trends (Negative = Early Pay)")
+            fig = px.bar(df, x='Wage Month', y='Grand Total (INR)', color='Late Days', title="PF Trends (Negative = Early Payment)")
             fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="white"))
             st.plotly_chart(fig, use_container_width=True)
         with c2:
             st.markdown("#### 📥 EXPORT COMMANDS")
-            st.download_button("🚀 DOWNLOAD EXCEL REPORT", to_excel_pro(df), "PF_Audit.xlsx")
-            st.download_button("📜 DOWNLOAD PDF AUDIT TRAIL", generate_pdf_summary(df, total_pf, total_dis), "PF_Audit_Trail.pdf")
+            st.download_button("🚀 DOWNLOAD EXCEL AUDIT", to_excel_pro(df), f"PF_Audit_{datetime.now().year}.xlsx")
+            pdf_data = generate_pdf_summary(df, total_pf, total_dis)
+            st.download_button("📜 DOWNLOAD PDF AUDIT TRAIL", pdf_data, "PF_Audit_Trail.pdf", "application/pdf")
 
-        st.dataframe(df.style.format({"Grand Total (INR)": "{:,.2f}", "PF Disallowance (INR)": "{:,.2f}", "Admin Charges (INR)": "{:,.2f}"}), use_container_width=True)
-    else:
-        st.error("❌ No valid patterns found. Ensure the PDF is a digital EPFO challan receipt.")
+        st.dataframe(df.style.format({"Grand Total (INR)": "{:,.2f}", "PF Disallowance (INR)": "{:,.2f}", "Employee Share (INR)": "{:,.2f}", "Admin Charges (INR)": "{:,.2f}"}), use_container_width=True)
 
-st.caption("© 2026 | Enterprise Auditor Pro | Developed by Abhishek Jakkula")
+st.caption("© 2026 | Enterprise Auditor Pro | Developed by Abhishek Jakkula | jakkulaabhishek5@gmail.com")
