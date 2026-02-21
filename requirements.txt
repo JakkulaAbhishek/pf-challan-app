@@ -1,6 +1,6 @@
-fpdf
 streamlit
-pdfplumber
 pandas
+pdfplumber
 openpyxl
 plotly
+fpdf
