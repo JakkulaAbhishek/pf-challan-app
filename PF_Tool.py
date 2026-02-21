@@ -11,7 +11,7 @@ from fpdf import FPDF
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="PF AI Command Center", layout="wide", page_icon="📊")
 
-# ---------------- ULTRA STYLISH UI ----------------
+# ---------------- ULTRA STYLISH UI THEME ----------------
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
@@ -19,7 +19,7 @@ st.markdown("""
     .stApp { background: radial-gradient(circle at 20% 20%, #0f172a 0%, #020617 100%); color: #f8fafc; }
     .header-card {
         background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8));
-        padding: 40px; border-radius: 24px; border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 40px; border-radius: 28px; border: 1px solid rgba(255, 255, 255, 0.1);
         backdrop-filter: blur(20px); text-align: center; margin-bottom: 30px;
     }
     .main-title {
@@ -29,7 +29,7 @@ st.markdown("""
     }
     .stButton>button {
         background: linear-gradient(90deg, #2563eb, #0ea5e9);
-        color: white !important; border: none; border-radius: 12px;
+        color: white !important; border: none; border-radius: 14px;
         font-weight: 800; height: 55px; width: 100%;
     }
     [data-testid="stMetric"] {
@@ -49,7 +49,6 @@ st.markdown("""
 
 # ---------------- HELPERS ----------------
 def safe_extract(pattern, text):
-    # This specific regex targets the value at the end of the line (TOTAL column)
     m = re.search(pattern, text, re.I | re.M)
     if m:
         val = m.group(1).replace(",", "").strip()
@@ -95,7 +94,7 @@ def generate_pdf_summary(df, total_pf, disallowance):
 
     pdf.set_font("Arial", 'B', 8); pdf.set_fill_color(30, 41, 59); pdf.set_text_color(255, 255, 255)
     w = [30, 25, 25, 15, 25, 30, 30, 30, 35, 25] 
-    headers = ["Wage Month", "Due Date", "Paid Date", "Diff", "Admin", "Employer", "Employee", "Total", "Disallowance", "Status"]
+    headers = ["Wage Month", "Due Date", "Paid Date", "Diff", "Admin", "Employer Share", "Employee Share", "Grand Total", "Disallowance", "Status"]
     for i in range(len(headers)): pdf.cell(w[i], 10, headers[i], 1, 0, 'C', True)
     pdf.ln()
 
@@ -104,13 +103,13 @@ def generate_pdf_summary(df, total_pf, disallowance):
         pdf.cell(w[0], 8, str(row['Wage Month']), 1)
         pdf.cell(w[1], 8, str(row['Due Date']), 1, 0, 'C')
         pdf.cell(w[2], 8, str(row['Generated Date']), 1, 0, 'C')
-        pdf.cell(w[3], 8, str(row['Diff Days']), 1, 0, 'C')
+        pdf.cell(w[3], 8, str(row['Late Days']), 1, 0, 'C')
         pdf.cell(w[4], 8, f"{row['Admin Charges']:,.2f}", 1, 0, 'R')
         pdf.cell(w[5], 8, f"{row['Employer Share']:,.2f}", 1, 0, 'R')
         pdf.cell(w[6], 8, f"{row['Employee Share']:,.2f}", 1, 0, 'R')
         pdf.cell(w[7], 8, f"{row['Grand Total']:,.2f}", 1, 0, 'R')
         pdf.cell(w[8], 8, f"{row['Disallowance']:,.2f}", 1, 0, 'R')
-        pdf.cell(w[9], 8, "LATE" if row['Diff Days'] > 0 else "OK", 1, 1, 'C')
+        pdf.cell(w[9], 8, "LATE" if row['Late Days'] > 0 else "OK", 1, 1, 'C')
     
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
@@ -133,17 +132,18 @@ if files and run:
                 gen_date_str = safe_extract(r"system generated challan on\s*.*?(\d{2}-[A-Z]{3}-\d{4})", content).upper()
                 due_dt = calculate_due_date(wage_month)
                 
-                # Targeted Extraction for the TOTAL column at the end of each line
+                # Targeted Extraction for the TOTAL column at the far right ($)
                 admin = float(safe_extract(r"Administration Charges\s+.*?\s+(\d[\d,.]*)$", content))
                 employer = float(safe_extract(r"Employer'?s Share Of\s+.*?\s+(\d[\d,.]*)$", content))
                 employee = float(safe_extract(r"Employee'?s Share Of\s+.*?\s+(\d[\d,.]*)$", content))
                 total_val = float(safe_extract(r"Grand Total\s*:\s*.*?\s+(\d[\d,.]*)$", content))
                 
-                diff = (datetime.strptime(gen_date_str, "%d-%B-%Y") - due_dt).days if due_dt and gen_date_str != "0" else 0
+                # Late Days: Negative means early, Positive means late
+                diff = (datetime.strptime(gen_date_str, "%d-%b-%Y") - due_dt).days if due_dt and gen_date_str != "0" else 0
                 
                 all_data.append({
                     "Wage Month": wage_month, "Due Date": due_dt.strftime("%d-%b-%Y") if due_dt else "N/A",
-                    "Generated Date": gen_date_str, "Diff Days": diff,
+                    "Generated Date": gen_date_str, "Late Days": diff,
                     "Admin Charges": admin, "Employer Share": employer, "Employee Share": employee,
                     "Grand Total": total_val, "Disallowance": employee if diff > 0 else 0.0
                 })
@@ -152,19 +152,19 @@ if files and run:
         df = pd.DataFrame(all_data)
         st.markdown("### 📊 AUDIT DASHBOARD")
         m1, m2, m3 = st.columns(3)
-        m1.metric("TOTAL PF PAID", f"INR {df['Grand Total'].sum():,.2f}")
+        m1.metric("TOTAL PF AUDITED", f"INR {df['Grand Total'].sum():,.2f}")
         m2.metric("TAX DISALLOWANCE", f"INR {df['Disallowance'].sum():,.2f}", delta_color="inverse")
-        m3.metric("LATE FILINGS", len(df[df['Diff Days'] > 0]))
+        m3.metric("LATE FILINGS", len(df[df['Late Days'] > 0]))
 
         st.markdown("---")
-        fig = px.bar(df, x='Wage Month', y='Grand Total', color='Diff Days', title="PF Contribution Trends (Negative = Early)")
+        fig = px.bar(df, x='Wage Month', y='Grand Total', color='Late Days', title="PF Contribution Trends (Negative = Early Payment)")
         fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", font=dict(color="white"))
         st.plotly_chart(fig, use_container_width=True)
 
         c1, c2 = st.columns(2)
-        with c1: st.download_button("🚀 DOWNLOAD EXCEL AUDIT", to_excel_pro(df), "PF_Audit.xlsx")
+        with c1: st.download_button("🚀 DOWNLOAD EXCEL AUDIT", to_excel_pro(df), "PF_Audit_Report.xlsx")
         with c2: st.download_button("📜 DOWNLOAD PDF AUDIT TRAIL", generate_pdf_summary(df, df['Grand Total'].sum(), df['Disallowance'].sum()), "PF_Audit_Trail.pdf")
 
-        st.dataframe(df.style.format({"Grand Total": "{:,.2f}", "Disallowance": "{:,.2f}"}), use_container_width=True)
+        st.dataframe(df.style.format({"Grand Total": "{:,.2f}", "Disallowance": "{:,.2f}", "Employer Share": "{:,.2f}", "Employee Share": "{:,.2f}", "Admin Charges": "{:,.2f}"}), use_container_width=True)
 
 st.caption("© 2026 | Developed by Abhishek Jakkula")
