@@ -1,6 +1,7 @@
 streamlit
-pdfplumber
 pandas
+pdfplumber
 openpyxl
-pytesseract
-Pillow
+plotly
+rapidfuzz
+xlsxwriter
