@@ -11,7 +11,7 @@ from fpdf import FPDF
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="PF AI Command Center", layout="wide", page_icon="📊")
 
-# ---------------- ULTRA STYLISH UI THEME ----------------
+# ---------------- ULTRA STYLISH UI ----------------
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
@@ -21,7 +21,6 @@ st.markdown("""
         background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8));
         padding: 40px; border-radius: 28px; border: 1px solid rgba(255, 255, 255, 0.1);
         backdrop-filter: blur(20px); text-align: center; margin-bottom: 40px;
-        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4);
     }
     .main-title {
         background: linear-gradient(90deg, #38bdf8, #60a5fa, #34d399);
@@ -33,14 +32,9 @@ st.markdown("""
         color: white !important; border: none; border-radius: 14px;
         font-weight: 800; height: 60px; width: 100%; transition: 0.4s;
     }
-    [data-testid="stMetric"] {
-        background: rgba(30, 41, 59, 0.6) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        padding: 25px !important; border-radius: 24px !important;
-    }
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------- BRANDED HEADER ----------------
 st.markdown("""
 <div class="header-card">
     <div class="main-title">PF CHALLAN AI COMMAND CENTER</div>
@@ -64,21 +58,6 @@ def calculate_due_date(wage_month_str):
         return datetime(next_y, next_m, 15)
     except: return None
 
-# ---------------- EXCEL EXPORTER ----------------
-def to_excel_pro(df):
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='PF_Audit_Report')
-        ws = writer.sheets['PF_Audit_Report']
-        h_fill, h_font = PatternFill(start_color="1e293b", end_color="1e293b", fill_type="solid"), Font(bold=True, color="FFFFFF")
-        for cell in ws[1]:
-            cell.font, cell.fill, cell.alignment = h_font, h_fill, Alignment(horizontal="center")
-        for col in ws.columns:
-            max_len = max([len(str(cell.value)) for cell in col])
-            ws.column_dimensions[col[0].column_letter].width = max_len + 3
-    return output.getvalue()
-
-# ---------------- PDF GENERATOR (FIXED ENCODING) ----------------
 def generate_pdf_summary(df, total_pf, disallowance):
     pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.add_page()
@@ -93,7 +72,7 @@ def generate_pdf_summary(df, total_pf, disallowance):
     pdf.ln(5)
 
     pdf.set_font("Arial", 'B', 8); pdf.set_fill_color(30, 41, 59); pdf.set_text_color(255, 255, 255)
-    w = [30, 25, 25, 15, 25, 30, 30, 30, 35, 20] 
+    w = [30, 25, 25, 15, 25, 30, 30, 30, 30, 20] 
     headers = ["Wage Month", "Due Date", "Paid Date", "Diff", "Admin", "Employer", "Employee", "Total", "Disallowance", "Status"]
     for i in range(len(headers)): pdf.cell(w[i], 10, headers[i], 1, 0, 'C', True)
     pdf.ln()
@@ -113,12 +92,9 @@ def generate_pdf_summary(df, total_pf, disallowance):
     
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
-# ---------------- COMMAND CENTER ----------------
-col_f, col_a = st.columns([2, 1])
-with col_f: files = st.file_uploader("📂 DROP PF CHALLAN PDFs HERE", type="pdf", accept_multiple_files=True)
-with col_a: 
-    st.markdown("<br>", unsafe_allow_html=True)
-    run_audit = st.button("🚀 INITIATE SYSTEM AUDIT")
+# ---------------- MAIN APP ----------------
+files = st.file_uploader("📂 DROP PF CHALLAN PDFs HERE", type="pdf", accept_multiple_files=True)
+run_audit = st.button("🚀 INITIATE SYSTEM AUDIT")
 
 if files and run_audit:
     all_rows = []
@@ -132,42 +108,36 @@ if files and run_audit:
                 wage_month = f"{m_match.group(1).title()} {m_match.group(2)}" if m_match else "Unknown"
                 sys_date_str = safe_extract(r"system generated challan on\s*.*?(\d{2}-[A-Z]{3}-\d{4})", content).upper()
                 due_dt = calculate_due_date(wage_month)
-                emp_share = float(safe_extract(r"Employee'?s Share Of.*?([0-9,]{2,})", content).replace(",", ""))
                 
-                # Logic: Positive = Late, Negative = Early
+                # Enhanced Financial Extraction
+                admin = float(safe_extract(r"Administration Charges.*?(\d[\d,.]*)", content).replace(",", ""))
+                employer = float(safe_extract(r"Employer'?s Share Of.*?(\d[\d,.]*)", content).replace(",", ""))
+                employee = float(safe_extract(r"Employee'?s Share Of.*?(\d[\d,.]*)", content).replace(",", ""))
+                
+                # FIXED: Force Grand Total to be the mathematical sum to avoid extraction errors
+                grand_total = admin + employer + employee
+                
                 late_days = (datetime.strptime(sys_date_str, "%d-%b-%Y") - due_dt).days if due_dt and sys_date_str != "0" else 0
                 
                 all_rows.append({
                     "Wage Month": wage_month, "Due Date": due_dt.strftime("%d-%b-%Y") if due_dt else "N/A",
                     "Generated Date": sys_date_str, "Late Days": late_days,
-                    "Admin Charges (INR)": float(safe_extract(r"Administration Charges.*?([0-9,]{2,})", content).replace(",", "")),
-                    "Employer Share (INR)": float(safe_extract(r"Employer'?s Share Of.*?([0-9,]{2,})", content).replace(",", "")),
-                    "Employee Share (INR)": emp_share, "PF Disallowance (INR)": emp_share if late_days > 0 else 0.0,
-                    "Grand Total (INR)": float(safe_extract(r"Grand Total.*?([0-9,]{2,})", content).replace(",", ""))
+                    "Admin Charges (INR)": admin, "Employer Share (INR)": employer,
+                    "Employee Share (INR)": employee, "PF Disallowance (INR)": employee if late_days > 0 else 0.0,
+                    "Grand Total (INR)": grand_total, "Source File": f.name
                 })
 
     if all_rows:
         df = pd.DataFrame(all_rows)
-        total_pf, total_dis = df['Grand Total (INR)'].sum(), df['PF Disallowance (INR)'].sum()
-        
-        st.markdown("### 📊 STATUTORY COMMAND INSIGHTS")
+        st.markdown("### 📊 STATUTORY DASHBOARD")
         m1, m2, m3 = st.columns(3)
+        total_pf, total_dis = df['Grand Total (INR)'].sum(), df['PF Disallowance (INR)'].sum()
         m1.metric("TOTAL PF AUDITED", f"INR {total_pf:,.2f}")
-        m2.metric("TAX DISALLOWANCE", f"INR {total_dis:,.2f}", delta=f"Risk: {total_dis*0.3:,.0f}", delta_color="inverse")
+        m2.metric("TAX DISALLOWANCE", f"INR {total_dis:,.2f}", delta_color="inverse")
         m3.metric("LATE FILINGS", len(df[df['Late Days'] > 0]))
 
-        st.markdown("---")
-        c1, c2 = st.columns([1.5, 1])
-        with c1:
-            fig = px.bar(df, x='Wage Month', y='Grand Total (INR)', color='Late Days', title="PF Contribution Trend (Negative = Early Payment)")
-            fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="white"))
-            st.plotly_chart(fig, use_container_width=True)
-        with c2:
-            st.markdown("#### 📥 EXPORT COMMANDS")
-            st.download_button("🚀 DOWNLOAD EXCEL AUDIT", to_excel_pro(df), f"PF_Audit_{datetime.now().year}.xlsx")
-            pdf_data = generate_pdf_summary(df, total_pf, total_dis)
-            st.download_button("📜 DOWNLOAD PDF AUDIT TRAIL", pdf_data, "PF_Audit_Trail.pdf", "application/pdf")
+        # Charts and Downloads
+        st.download_button("📜 DOWNLOAD PDF AUDIT TRAIL", generate_pdf_summary(df, total_pf, total_dis), "PF_Audit_Trail.pdf", "application/pdf")
+        st.dataframe(df.style.format({"Grand Total (INR)": "{:,.2f}", "PF Disallowance (INR)": "{:,.2f}"}), use_container_width=True)
 
-        st.dataframe(df.style.format({"Grand Total (INR)": "{:,.2f}", "PF Disallowance (INR)": "{:,.2f}", "Employee Share (INR)": "{:,.2f}", "Admin Charges (INR)": "{:,.2f}", "Employer Share (INR)": "{:,.2f}"}), use_container_width=True)
-
-st.caption("© 2026 | Enterprise Auditor Pro | Developed by Abhishek Jakkula | jakkulaabhishek5@gmail.com")
+st.caption("© 2026 | Enterprise Auditor Pro | Developed by Abhishek Jakkula")
