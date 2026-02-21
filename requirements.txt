@@ -1,7 +1,6 @@
+fpdf
 streamlit
-pandas
 pdfplumber
+pandas
 openpyxl
 plotly
-rapidfuzz
-xlsxwriter
