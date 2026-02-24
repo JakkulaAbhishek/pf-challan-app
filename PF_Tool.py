@@ -11,42 +11,102 @@ from fpdf import FPDF
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="PF AI Command Center", layout="wide", page_icon="📊")
 
-# ---------------- ULTRA STYLISH UI THEME ----------------
+# ---------------- THEME SAFE PROFESSIONAL UI ----------------
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-    .stApp { background: radial-gradient(circle at 20% 20%, #0f172a 0%, #020617 100%); color: #f8fafc; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+}
+
+/* DO NOT force dark background */
+.stApp {
+    background-color: transparent;
+}
+
+/* Header Card */
+.header-card {
+    padding: 35px;
+    border-radius: 20px;
+    border: 1px solid rgba(0,0,0,0.08);
+    background: rgba(37, 99, 235, 0.05);
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+/* Dark mode header fix */
+@media (prefers-color-scheme: dark) {
     .header-card {
-        background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8));
-        padding: 40px; border-radius: 28px; border: 1px solid rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(20px); text-align: center; margin-bottom: 30px;
+        background: rgba(37, 99, 235, 0.12);
+        border: 1px solid rgba(255,255,255,0.1);
     }
-    .main-title {
-        background: linear-gradient(90deg, #38bdf8, #60a5fa, #34d399);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        font-weight: 800; font-size: 3rem;
-    }
-    .stButton>button {
-        background: linear-gradient(90deg, #2563eb, #0ea5e9);
-        color: white !important; border: none; border-radius: 14px;
-        font-weight: 800; height: 55px; width: 100%;
-    }
+}
+
+.main-title {
+    font-weight: 800;
+    font-size: 2.7rem;
+    background: linear-gradient(90deg, #2563eb, #0ea5e9);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+    opacity: 0.8;
+    font-weight: 600;
+    margin-top: 10px;
+}
+
+/* Buttons */
+.stButton>button {
+    background: linear-gradient(90deg, #2563eb, #0ea5e9);
+    color: white;
+    border-radius: 10px;
+    font-weight: 700;
+    height: 48px;
+    border: none;
+}
+
+.stButton>button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(37, 99, 235, 0.4);
+}
+
+/* Metrics */
+[data-testid="stMetric"] {
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 14px;
+    padding: 20px;
+    border: 1px solid rgba(0,0,0,0.06);
+}
+
+@media (prefers-color-scheme: dark) {
     [data-testid="stMetric"] {
-        background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 20px; border-radius: 20px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
     }
+}
+
+[data-testid="stMetricValue"] {
+    font-weight: 800;
+    font-size: 1.6rem;
+}
+
+/* Hide default footer */
+footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
+# ---------------- HEADER ----------------
 st.markdown("""
 <div class="header-card">
     <div class="main-title">PF CHALLAN AI COMMAND CENTER</div>
-    <div style="color: #94a3b8; font-size: 1.1rem; font-weight: 600; margin-top:10px;">ENTERPRISE AUDIT SUITE BY ABHISHEK JAKKULA</div>
-    <div style="color: #facc15; font-style: italic; margin-top: 15px;">🌸 Lord Krishna Blessings: कर्मण्येवाधिकारस्ते मा फलेषु कदाचन 🌸</div>
+    <div class="subtitle">Enterprise Statutory Audit Suite</div>
+    <div style="margin-top:10px; font-style:italic; opacity:0.7;">
+        🌸 कर्मण्येवाधिकारस्ते मा फलेषु कदाचन 🌸
+    </div>
 </div>
 """, unsafe_allow_html=True)
-
 # ---------------- HELPERS ----------------
 def safe_extract(pattern, text):
     m = re.search(pattern, text, re.I | re.M)
@@ -179,4 +239,5 @@ if files and run:
         st.dataframe(df.style.format({"Grand Total": "{:,.2f}", "Employee Disallowance": "{:,.2f}", "Employer Share": "{:,.2f}"}), use_container_width=True)
 
 st.caption("© 2026 | Developed by Abhishek Jakkula")
+
 
