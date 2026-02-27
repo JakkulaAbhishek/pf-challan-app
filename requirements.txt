@@ -1,6 +1,0 @@
-streamlit
-pandas
-pdfplumber
-openpyxl
-plotly
-fpdf
