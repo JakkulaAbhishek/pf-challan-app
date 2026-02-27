@@ -11,7 +11,7 @@ from fpdf import FPDF
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="PF AI Command Center", layout="wide", page_icon="📊")
 
-# ---------------- ULTRA STYLISH UI (GLASSMORPHISM + ANIMATIONS) ----------------
+# ---------------- ULTRA STYLISH UI (GLASSMORPHISM + ADVANCED ANIMATIONS) ----------------
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
@@ -22,11 +22,33 @@ html, body, [class*="css"] {
     scroll-behavior: smooth;
 }
 
-/* Animated gradient background (light mode) */
+/* Animated gradient background with floating particles */
 .stApp {
     background: linear-gradient(-45deg, #f0f9ff, #e6f0fa, #d9e9f5, #e6f0fa);
     background-size: 400% 400%;
     animation: gradientBG 15s ease infinite;
+    position: relative;
+    overflow: hidden;
+}
+
+.stApp::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml;utf8,<svg width="100%" height="100%" viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg"><circle cx="200" cy="200" r="40" fill="rgba(37,99,235,0.03)" /><circle cx="600" cy="400" r="60" fill="rgba(14,165,233,0.03)" /><circle cx="300" cy="600" r="80" fill="rgba(124,58,237,0.02)" /><circle cx="700" cy="100" r="30" fill="rgba(37,99,235,0.03)" /></svg>');
+    background-size: cover;
+    animation: floatParticles 30s linear infinite;
+    pointer-events: none;
+    z-index: 0;
+}
+
+@keyframes floatParticles {
+    0% { transform: translate(0, 0) rotate(0deg); }
+    50% { transform: translate(2%, 2%) rotate(1deg); }
+    100% { transform: translate(0, 0) rotate(0deg); }
 }
 
 @keyframes gradientBG {
@@ -42,9 +64,12 @@ html, body, [class*="css"] {
         background-size: 400% 400%;
         animation: gradientBG 15s ease infinite;
     }
+    .stApp::before {
+        opacity: 0.2;
+    }
 }
 
-/* Glassmorphism Card */
+/* Glassmorphism Card with glow */
 .glass-card {
     backdrop-filter: blur(10px);
     background: rgba(255, 255, 255, 0.25);
@@ -54,11 +79,13 @@ html, body, [class*="css"] {
     padding: 2rem;
     margin-bottom: 2rem;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
+    position: relative;
+    z-index: 1;
 }
 
 .glass-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 12px 40px rgba(37, 99, 235, 0.2);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -68,7 +95,7 @@ html, body, [class*="css"] {
     }
 }
 
-/* Header Card */
+/* Header Card with floating animation */
 .header-card {
     text-align: center;
     padding: 2.5rem 2rem;
@@ -80,6 +107,14 @@ html, body, [class*="css"] {
     margin-bottom: 2rem;
     position: relative;
     overflow: hidden;
+    animation: float 6s ease-in-out infinite;
+    z-index: 1;
+}
+
+@keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-8px); }
+    100% { transform: translateY(0px); }
 }
 
 .header-card::before {
@@ -128,7 +163,7 @@ html, body, [class*="css"] {
     }
 }
 
-/* Metric Cards */
+/* Metric Cards with pulse on hover */
 [data-testid="stMetric"] {
     background: rgba(255, 255, 255, 0.25);
     backdrop-filter: blur(8px);
@@ -137,12 +172,22 @@ html, body, [class*="css"] {
     border: 1px solid rgba(255, 255, 255, 0.3);
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
     transition: all 0.3s ease;
+    position: relative;
+    z-index: 1;
+    animation: glowPulse 4s infinite;
+}
+
+@keyframes glowPulse {
+    0% { box-shadow: 0 4px 15px rgba(37, 99, 235, 0.1); }
+    50% { box-shadow: 0 8px 25px rgba(37, 99, 235, 0.3); }
+    100% { box-shadow: 0 4px 15px rgba(37, 99, 235, 0.1); }
 }
 
 [data-testid="stMetric"]:hover {
-    transform: scale(1.02);
+    transform: scale(1.03) translateY(-3px);
     background: rgba(255, 255, 255, 0.35);
     border-color: rgba(37, 99, 235, 0.5);
+    animation: none;
 }
 
 [data-testid="stMetricLabel"] {
@@ -168,7 +213,7 @@ html, body, [class*="css"] {
     }
 }
 
-/* Buttons */
+/* Buttons with enhanced glow and pulse */
 .stButton > button {
     background: linear-gradient(135deg, #2563eb, #0ea5e9, #7c3aed);
     background-size: 200% auto;
@@ -184,19 +229,38 @@ html, body, [class*="css"] {
     border: 1px solid rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(4px);
     width: 100%;
+    position: relative;
+    overflow: hidden;
+}
+
+.stButton > button::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.4s;
 }
 
 .stButton > button:hover {
     transform: translateY(-3px) scale(1.02);
-    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.5);
+    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.6);
     background-position: right center;
+}
+
+.stButton > button:hover::after {
+    opacity: 0.2;
+    animation: rotate 4s linear infinite;
 }
 
 .stButton > button:active {
     transform: translateY(-1px);
 }
 
-/* File uploader */
+/* File uploader with scale hover */
 [data-testid="stFileUploader"] {
     background: rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(8px);
@@ -204,20 +268,28 @@ html, body, [class*="css"] {
     padding: 1.5rem;
     border: 2px dashed rgba(37, 99, 235, 0.5);
     transition: all 0.3s ease;
+    z-index: 1;
+    position: relative;
 }
 
 [data-testid="stFileUploader"]:hover {
     border-color: #2563eb;
     background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.01);
 }
 
-/* Dataframe */
+/* Dataframe with glass effect */
 [data-testid="stDataFrame"] {
     background: rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(8px);
     border-radius: 20px;
     padding: 1rem;
     border: 1px solid rgba(255, 255, 255, 0.3);
+    transition: box-shadow 0.3s;
+}
+
+[data-testid="stDataFrame"]:hover {
+    box-shadow: 0 8px 30px rgba(37, 99, 235, 0.15);
 }
 
 /* Plotly chart background */
@@ -242,7 +314,7 @@ html, body, [class*="css"] {
     background: #2563eb;
 }
 
-/* Footer */
+/* Footer with email link */
 .footer {
     text-align: center;
     margin-top: 3rem;
@@ -251,11 +323,31 @@ html, body, [class*="css"] {
     color: #1e293b;
     padding: 1rem;
     border-top: 1px solid rgba(0,0,0,0.1);
+    transition: opacity 0.3s;
+    z-index: 1;
+    position: relative;
+}
+
+.footer:hover {
+    opacity: 1;
+}
+
+.footer a {
+    color: #2563eb;
+    text-decoration: none;
+    border-bottom: 1px dotted #2563eb;
+}
+
+.footer a:hover {
+    border-bottom: 1px solid #2563eb;
 }
 
 @media (prefers-color-scheme: dark) {
     .footer {
         color: #cbd5e1;
+    }
+    .footer a {
+        color: #60a5fa;
     }
 }
 </style>
@@ -442,9 +534,10 @@ if files and run:
                 height=400
             )
 
-# ---------------- FOOTER ----------------
+# ---------------- FOOTER (with email and developer credit) ----------------
 st.markdown("""
 <div class="footer">
-    © 2026 | Developed by Abhishek Jakkula | <span style="color: #2563eb;">⚡ AI-Powered Statutory Audit</span>
+    © 2026 | Developed by <strong>Abhishek Jakkula</strong> | <a href="mailto:jakkulaabhishek5@gmail.com">jakkulaabhishek5@gmail.com</a><br>
+    <span style="color: #2563eb;">⚡ AI-Powered Statutory Audit</span>
 </div>
 """, unsafe_allow_html=True)
