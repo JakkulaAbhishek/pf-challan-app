@@ -496,7 +496,7 @@ if files and run:
             fig.update_layout(
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="#1e293b" if st.get_option("theme.base")=="light" else "#f1f5f9"),
+                font=dict(color="#1e293b"),  # fixed color to avoid theme detection issues
                 hovermode="x"
             )
             fig.update_traces(marker_line_width=0)
